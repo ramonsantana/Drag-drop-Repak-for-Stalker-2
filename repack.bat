@@ -47,6 +47,6 @@ if "%jsonFilesFound%"=="1" (
 
 repak.exe pack --version V11 "%folder%/" "%foldername%.pak"
 echo.
-echo Command executed: repak.exe pack --version V11 "%folder%/" "%foldername%.pak"
+echo Command executed: repak.exe pack --version V11 %folder%/ %foldername%.pak
 echo.
 pause
