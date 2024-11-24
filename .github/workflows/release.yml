@@ -21,9 +21,9 @@ jobs:
       # 2. Use cmd shell to build the batch file, parameters may be passed to it,
       #    and if it exits with ERRORLEVEL != 0 it will halt.
       #    The text output from the batch file will be in the log.
-      - name: Build ROM
+      - name: Test and release
         shell: cmd
-        run: build_rom.bat param
+        run: repack.bat
 
       # 3. Set the build machine time zone to have consistent artifact timestamps.
       - name: Select Time Zone
