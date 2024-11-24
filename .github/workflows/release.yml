@@ -1,36 +1,64 @@
-# This is a basic workflow to help you get started with Actions
-
-name: CI
-
-# Controls when the workflow will run
+# Action name and trigger conditions.
+# workflow_dispatch means: this can be manually re-triggered, and not just by push/pr.
+name: Batch File Continuous Integration
 on:
-  # Triggers the workflow on push or pull request events but only for the "main" branch
   push:
     branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
-
-  # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
-# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+# Can have multiple jobs, but this example is just one build job.
 jobs:
-  # This workflow contains a single job called "build"
   build:
-    # The type of runner that the job will run on
-    runs-on: ubuntu-latest
-
-    # Steps represent a sequence of tasks that will be executed as part of the job
+    runs-on: windows-latest
     steps:
-      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - uses: actions/checkout@v4
+    
+      # 1. Check out repository to current directory.
+      - name: Checkout Files
+        uses: actions/checkout@v3
+        
+      # 2. Use cmd shell to build the batch file, parameters may be passed to it,
+      #    and if it exits with ERRORLEVEL != 0 it will halt.
+      #    The text output from the batch file will be in the log.
+      - name: Build ROM
+        shell: cmd
+        run: build_rom.bat param
 
-      # Runs a single command using the runners shell
-      - name: Run a one-line script
-        run: echo Hello, world!
+      # 3. Set the build machine time zone to have consistent artifact timestamps.
+      - name: Select Time Zone
+        uses: szenius/set-timezone@v1.2
+        with:
+          timezoneWindows: "Mountain Time"
 
-      # Runs a set of commands using the runners shell
-      - name: Run a multi-line script
+      # 4. Use powershell to gather files for the artifact, and generate a filename.
+      #    Note that the output of commands is not shown in the log unless it causes an error.
+      #    The artifact copying could be done by the batch file,
+      #    but I liked having an example of how to do it in powershell.
+      #    If a file is optional, -ErrorAction Ignore can be used to keep going if it doesn't exist.
+      #    'git log -1' lists information about the last commit.
+      #    It is used to get the 7-letter short SHA hash (%h),
+      #    and a formatted date for the commit's authoring (%ad).
+      #    The local time zone is selected (--date=format-local)
+      #    rather than the comitter's time zone (--date=format).
+      #    By appending "NAME=VALUE" to the special file $env:GITHUB_ENV,
+      #    it sets an environment variable that we can use in later steps.
+      #    This is apparently the best way to get a short SHA,
+      #    because actions only have a long SHA built in,
+      #    and YAML is not very good at string manipulation.
+      - name: Prepare Artifact
+        shell: pwsh
         run: |
-          echo Add other actions to build,
-          echo test, and deploy your project.
+          mkdir artifact
+          cp test3.txt artifact
+          cp build/bt.txt artifact
+          cp missing.txt artifact -ErrorAction Ignore
+          cp missing2.txt artifact
+          echo "BUILD_TAG=$(git log -1 --format="%h--%ad" --date=format-local:"%Y-%m-%d-%H%M%S")" >> $env:GITHUB_ENV
+      # 5. Attach the artifact to the job.
+      #    Here we used the environment variable we created in the previous step.
+      - name: ROM Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: name-${{ env.BUILD_TAG }}
+          path: artifact/
